@@ -5,36 +5,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>しりとり</title>
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
   <h1>しりとり</h1>
 
-  <p id="previousWord"></p>
+  <!-- 現在の単語を表示 -->
+  <p id="previousWord">前の単語を読み込み中です</p>
 
+  <!-- エラーやゲーム終了のメッセージを表示 -->
+  <p id="message"></p>
+
+  <!-- 次の単語を入力 -->
   <input id="nextWordInput" type="text" placeholder="次の単語を入力" />
 
   <button id="nextWordSendButton">送信</button>
 
+  <button id="resetSendButton">リセット</button>
+
   <script>
+    const previousWordParagraph =
+      document.querySelector("#previousWord");
+
+    const messageParagraph =
+      document.querySelector("#message");
+
+    const nextWordInput =
+      document.querySelector("#nextWordInput");
+
+    const nextWordSendButton =
+      document.querySelector("#nextWordSendButton");
+
+    const resetSendButton =
+      document.querySelector("#resetSendButton");
+
+    // 現在の単語をサーバーから取得する
     async function displayPreviousWord() {
       const response = await fetch("/shiritori", {
         method: "GET",
       });
 
-      const previousWord = await response.text();
+      const responseJson = await response.json();
 
-      const paragraph = document.querySelector("#previousWord");
-      paragraph.textContent = `前の単語: ${previousWord}`;
+      previousWordParagraph.textContent =
+        `前の単語: ${responseJson.previousWord}`;
+
+      // ゲーム終了中なら入力できないようにする
+      if (responseJson.gameOver) {
+        nextWordInput.disabled = true;
+        nextWordSendButton.disabled = true;
+      } else {
+        nextWordInput.disabled = false;
+        nextWordSendButton.disabled = false;
+      }
     }
 
+    // ゲーム終了時の画面にする
+    function finishGame(message) {
+      messageParagraph.textContent = message;
+
+      nextWordInput.disabled = true;
+      nextWordSendButton.disabled = true;
+    }
+
+    // ページを開いたときに実行
     window.onload = async () => {
       await displayPreviousWord();
     };
 
-    document.querySelector("#nextWordSendButton").onclick = async () => {
-      const nextWordInput = document.querySelector("#nextWordInput");
+    // 送信ボタンが押されたとき
+    nextWordSendButton.onclick = async () => {
       const nextWordInputText = nextWordInput.value;
 
       const response = await fetch("/shiritori", {
@@ -47,22 +89,72 @@
         }),
       });
 
-      // HTTPステータスが200以外ならエラー
-      if (response.status !== 200) {
-        const errorJson = await response.text();
-        const errorObj = JSON.parse(errorJson);
+      const responseJson = await response.json();
 
-        alert(errorObj["errorMessage"]);
+      // エラーが返ってきた場合
+      if (response.status !== 200) {
+        messageParagraph.textContent =
+          responseJson.errorMessage;
+
+        // 「ん」または使用済み単語によるゲーム終了
+        if (
+          responseJson.errorCode === "10002" ||
+          responseJson.errorCode === "10003" ||
+          responseJson.errorCode === "10004"
+        ) {
+          if (responseJson.previousWord) {
+            previousWordParagraph.textContent =
+              `最後の単語: ${responseJson.previousWord}`;
+          }
+
+          finishGame(responseJson.errorMessage);
+        }
+
         return;
       }
 
-      const previousWord = await response.text();
+      // 正しく単語が更新された場合
+      previousWordParagraph.textContent =
+        `前の単語: ${responseJson.previousWord}`;
 
-      const paragraph = document.querySelector("#previousWord");
-      paragraph.textContent = `前の単語: ${previousWord}`;
+      messageParagraph.textContent = "";
+
+      // 入力欄を空にする
+      nextWordInput.value = "";
+
+      // 入力欄にカーソルを戻す
+      nextWordInput.focus();
+    };
+
+    // リセットボタンが押されたとき
+    resetSendButton.onclick = async () => {
+      const response = await fetch("/reset", {
+        method: "POST",
+      });
+
+      const responseJson = await response.json();
+
+      previousWordParagraph.textContent =
+        `前の単語: ${responseJson.previousWord}`;
+
+      messageParagraph.textContent = "";
 
       nextWordInput.value = "";
+      nextWordInput.disabled = false;
+      nextWordSendButton.disabled = false;
+
+      nextWordInput.focus();
     };
+
+    // 入力欄でEnterキーを押したときも送信する
+    nextWordInput.addEventListener("keydown", (event) => {
+      if (
+        event.key === "Enter" &&
+        !nextWordSendButton.disabled
+      ) {
+        nextWordSendButton.click();
+      }
+    });
   </script>
 </body>
 
