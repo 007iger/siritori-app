@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>しりとり</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <h1>しりとり</h1>
+
+  <p id="previousWord"></p>
+
+  <input id="nextWordInput" type="text" placeholder="次の単語を入力" />
+
+  <button id="nextWordSendButton">送信</button>
+
+  <script>
+    async function displayPreviousWord() {
+      const response = await fetch("/shiritori", {
+        method: "GET",
+      });
+
+      const previousWord = await response.text();
+
+      const paragraph = document.querySelector("#previousWord");
+      paragraph.textContent = `前の単語: ${previousWord}`;
+    }
+
+    window.onload = async () => {
+      await displayPreviousWord();
+    };
+
+    document.querySelector("#nextWordSendButton").onclick = async () => {
+      const nextWordInput = document.querySelector("#nextWordInput");
+      const nextWordInputText = nextWordInput.value;
+
+      const response = await fetch("/shiritori", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nextWord: nextWordInputText,
+        }),
+      });
+
+      // HTTPステータスが200以外ならエラー
+      if (response.status !== 200) {
+        const errorJson = await response.text();
+        const errorObj = JSON.parse(errorJson);
+
+        alert(errorObj["errorMessage"]);
+        return;
+      }
+
+      const previousWord = await response.text();
+
+      const paragraph = document.querySelector("#previousWord");
+      paragraph.textContent = `前の単語: ${previousWord}`;
+
+      nextWordInput.value = "";
+    };
+  </script>
+</body>
+
+</html>
