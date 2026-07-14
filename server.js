@@ -1,7 +1,23 @@
 import { serveDir } from "jsr:@std/http/file-server";
 
-// 使用した単語を保存する配列
-let wordHistories = ["しりとり"];
+// 最初の単語候補
+const startWords = [
+    "しりとり",
+    "りんご",
+    "ごりら",
+    "らっぱ",
+    "ぱんだ",
+    "だるま",
+];
+
+// 最初の単語をランダムに選ぶ
+function getRandomStartWord() {
+    const randomIndex = Math.floor(Math.random() * startWords.length);
+    return startWords[randomIndex];
+}
+
+// 使用した単語の履歴
+let wordHistories = [getRandomStartWord()];
 
 // ゲームが終了しているか
 let gameOver = false;
@@ -13,14 +29,15 @@ Deno.serve(async (request) => {
     console.log(`pathname: ${pathname}`);
 
     // GET /shiritori
-    // 現在の単語やゲームの状態を返す
+    // 現在の単語、履歴、ゲーム状態を返す
     if (request.method === "GET" && pathname === "/shiritori") {
         const previousWord = wordHistories[wordHistories.length - 1];
 
         return new Response(
             JSON.stringify({
-                previousWord: previousWord,
-                gameOver: gameOver,
+                previousWord,
+                wordHistories,
+                gameOver,
             }),
             {
                 headers: {
@@ -33,7 +50,6 @@ Deno.serve(async (request) => {
     // POST /shiritori
     // 入力された単語を確認する
     if (request.method === "POST" && pathname === "/shiritori") {
-        // すでにゲームが終了している場合
         if (gameOver) {
             return new Response(
                 JSON.stringify({
@@ -41,6 +57,7 @@ Deno.serve(async (request) => {
                         "ゲームは終了しています。リセットしてください",
                     errorCode: "10004",
                     gameOver: true,
+                    wordHistories,
                 }),
                 {
                     status: 400,
@@ -54,13 +71,14 @@ Deno.serve(async (request) => {
         const requestJson = await request.json();
         const nextWord = requestJson["nextWord"];
 
-        // 入力が空の場合
+        // 空欄チェック
         if (typeof nextWord !== "string" || nextWord.trim() === "") {
             return new Response(
                 JSON.stringify({
                     errorMessage: "単語を入力してください",
                     errorCode: "10000",
                     gameOver: false,
+                    wordHistories,
                 }),
                 {
                     status: 400,
@@ -71,25 +89,20 @@ Deno.serve(async (request) => {
             );
         }
 
-        // 入力の前後にある空白を削除
         const cleanedNextWord = nextWord.trim();
-
-        // 直前の単語を取得
         const previousWord = wordHistories[wordHistories.length - 1];
 
-        // 直前の単語の最後の文字
         const previousLastCharacter = previousWord.slice(-1);
-
-        // 入力された単語の最初の文字
         const nextFirstCharacter = cleanedNextWord.slice(0, 1);
 
-        // 単語がつながっていない場合
+        // 単語がつながっていない
         if (previousLastCharacter !== nextFirstCharacter) {
             return new Response(
                 JSON.stringify({
                     errorMessage: "前の単語に続いていません",
                     errorCode: "10001",
                     gameOver: false,
+                    wordHistories,
                 }),
                 {
                     status: 400,
@@ -100,7 +113,7 @@ Deno.serve(async (request) => {
             );
         }
 
-        // 過去に使用した単語だった場合
+        // 過去に使った単語
         if (wordHistories.includes(cleanedNextWord)) {
             gameOver = true;
 
@@ -110,6 +123,8 @@ Deno.serve(async (request) => {
                         "その単語はすでに使用されています。ゲーム終了です",
                     errorCode: "10003",
                     gameOver: true,
+                    previousWord,
+                    wordHistories,
                 }),
                 {
                     status: 400,
@@ -120,10 +135,10 @@ Deno.serve(async (request) => {
             );
         }
 
-        // 新しい単語を履歴に追加
+        // 履歴に追加
         wordHistories.push(cleanedNextWord);
 
-        // 入力された単語が「ん」で終わっている場合
+        // 「ん」で終了
         if (cleanedNextWord.slice(-1) === "ん") {
             gameOver = true;
 
@@ -133,6 +148,7 @@ Deno.serve(async (request) => {
                     errorCode: "10002",
                     gameOver: true,
                     previousWord: cleanedNextWord,
+                    wordHistories,
                 }),
                 {
                     status: 400,
@@ -143,10 +159,11 @@ Deno.serve(async (request) => {
             );
         }
 
-        // 正常に単語が更新された場合
+        // 正常に更新
         return new Response(
             JSON.stringify({
                 previousWord: cleanedNextWord,
+                wordHistories,
                 gameOver: false,
             }),
             {
@@ -159,14 +176,17 @@ Deno.serve(async (request) => {
     }
 
     // POST /reset
-    // ゲームを最初からやり直す
+    // ランダムな単語で最初からやり直す
     if (request.method === "POST" && pathname === "/reset") {
-        wordHistories = ["しりとり"];
+        const newStartWord = getRandomStartWord();
+
+        wordHistories = [newStartWord];
         gameOver = false;
 
         return new Response(
             JSON.stringify({
-                previousWord: "しりとり",
+                previousWord: newStartWord,
+                wordHistories,
                 gameOver: false,
             }),
             {
@@ -178,7 +198,7 @@ Deno.serve(async (request) => {
         );
     }
 
-    // publicフォルダ内のファイルを公開
+    // publicフォルダを公開
     return serveDir(request, {
         fsRoot: "./public/",
         urlRoot: "",

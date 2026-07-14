@@ -1,7 +1,36 @@
 body {
     background: skyblue;
+    font-family: sans-serif;
+}
+
+main {
+    max-width: 600px;
+    margin: 40px auto;
 }
 
 #message {
     color: red;
+    font-weight: bold;
+}
+
+#inputArea {
+    margin-bottom: 24px;
+}
+
+input {
+    padding: 8px;
+}
+
+button {
+    padding: 8px 12px;
+    margin-left: 4px;
+}
+
+section {
+    background: white;
+    padding: 16px;
+}
+
+#wordHistoryList {
+    padding-left: 24px;
 }

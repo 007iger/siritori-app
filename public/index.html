@@ -10,20 +10,25 @@
 </head>
 
 <body>
-  <h1>しりとり</h1>
+  <main>
+    <h1>しりとり</h1>
 
-  <!-- 現在の単語を表示 -->
-  <p id="previousWord">前の単語を読み込み中です</p>
+    <p id="previousWord">前の単語を読み込み中です</p>
 
-  <!-- エラーやゲーム終了のメッセージを表示 -->
-  <p id="message"></p>
+    <p id="message"></p>
 
-  <!-- 次の単語を入力 -->
-  <input id="nextWordInput" type="text" placeholder="次の単語を入力" />
+    <div id="inputArea">
+      <input id="nextWordInput" type="text" placeholder="次の単語を入力" />
 
-  <button id="nextWordSendButton">送信</button>
+      <button id="nextWordSendButton">送信</button>
+      <button id="resetSendButton">リセット</button>
+    </div>
 
-  <button id="resetSendButton">リセット</button>
+    <section>
+      <h2>単語の履歴</h2>
+      <ol id="wordHistoryList"></ol>
+    </section>
+  </main>
 
   <script>
     const previousWordParagraph =
@@ -41,8 +46,28 @@
     const resetSendButton =
       document.querySelector("#resetSendButton");
 
-    // 現在の単語をサーバーから取得する
-    async function displayPreviousWord() {
+    const wordHistoryList =
+      document.querySelector("#wordHistoryList");
+
+    // 履歴を画面に表示する
+    function displayWordHistories(wordHistories) {
+      wordHistoryList.innerHTML = "";
+
+      for (const word of wordHistories) {
+        const listItem = document.createElement("li");
+        listItem.textContent = word;
+        wordHistoryList.appendChild(listItem);
+      }
+    }
+
+    // ゲーム状態に応じて入力可否を変更
+    function updateInputState(gameOver) {
+      nextWordInput.disabled = gameOver;
+      nextWordSendButton.disabled = gameOver;
+    }
+
+    // サーバーから現在の状態を取得
+    async function loadGameState() {
       const response = await fetch("/shiritori", {
         method: "GET",
       });
@@ -52,30 +77,17 @@
       previousWordParagraph.textContent =
         `前の単語: ${responseJson.previousWord}`;
 
-      // ゲーム終了中なら入力できないようにする
-      if (responseJson.gameOver) {
-        nextWordInput.disabled = true;
-        nextWordSendButton.disabled = true;
-      } else {
-        nextWordInput.disabled = false;
-        nextWordSendButton.disabled = false;
-      }
+      displayWordHistories(responseJson.wordHistories);
+      updateInputState(responseJson.gameOver);
     }
 
-    // ゲーム終了時の画面にする
-    function finishGame(message) {
-      messageParagraph.textContent = message;
-
-      nextWordInput.disabled = true;
-      nextWordSendButton.disabled = true;
-    }
-
-    // ページを開いたときに実行
+    // ページ表示時
     window.onload = async () => {
-      await displayPreviousWord();
+      await loadGameState();
+      nextWordInput.focus();
     };
 
-    // 送信ボタンが押されたとき
+    // 送信ボタン
     nextWordSendButton.onclick = async () => {
       const nextWordInputText = nextWordInput.value;
 
@@ -91,42 +103,40 @@
 
       const responseJson = await response.json();
 
-      // エラーが返ってきた場合
+      // エラー時
       if (response.status !== 200) {
         messageParagraph.textContent =
           responseJson.errorMessage;
 
-        // 「ん」または使用済み単語によるゲーム終了
-        if (
-          responseJson.errorCode === "10002" ||
-          responseJson.errorCode === "10003" ||
-          responseJson.errorCode === "10004"
-        ) {
-          if (responseJson.previousWord) {
-            previousWordParagraph.textContent =
-              `最後の単語: ${responseJson.previousWord}`;
-          }
+        if (responseJson.previousWord) {
+          previousWordParagraph.textContent =
+            `最後の単語: ${responseJson.previousWord}`;
+        }
 
-          finishGame(responseJson.errorMessage);
+        if (responseJson.wordHistories) {
+          displayWordHistories(responseJson.wordHistories);
+        }
+
+        if (responseJson.gameOver) {
+          updateInputState(true);
         }
 
         return;
       }
 
-      // 正しく単語が更新された場合
+      // 正常時
       previousWordParagraph.textContent =
         `前の単語: ${responseJson.previousWord}`;
 
       messageParagraph.textContent = "";
 
-      // 入力欄を空にする
-      nextWordInput.value = "";
+      displayWordHistories(responseJson.wordHistories);
 
-      // 入力欄にカーソルを戻す
+      nextWordInput.value = "";
       nextWordInput.focus();
     };
 
-    // リセットボタンが押されたとき
+    // リセットボタン
     resetSendButton.onclick = async () => {
       const response = await fetch("/reset", {
         method: "POST",
@@ -139,14 +149,16 @@
 
       messageParagraph.textContent = "";
 
+      displayWordHistories(responseJson.wordHistories);
+
       nextWordInput.value = "";
-      nextWordInput.disabled = false;
-      nextWordSendButton.disabled = false;
+
+      updateInputState(false);
 
       nextWordInput.focus();
     };
 
-    // 入力欄でEnterキーを押したときも送信する
+    // Enterキーでも送信
     nextWordInput.addEventListener("keydown", (event) => {
       if (
         event.key === "Enter" &&
