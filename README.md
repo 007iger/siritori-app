@@ -116,9 +116,8 @@ http://localhost:8000
 - Deno Deploy
   https://deno.com/deploy
 
-- MDN Web Docs
-  https://developer.mozilla.org/ja/
-
+- 授業資料（Denoを用いたWebアプリケーション開発資料）
+  主に授業資料を参考にChatGPTをつかいながらわからない部分はわかりやすくおしえてもらった。
 ---
 
 ## AIの活用について
